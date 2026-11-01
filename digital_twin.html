@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Digital Twin - Smart Parking</title>
+
+<style>
+:root {
+    --navy: #102b68;
+    --blue: #1746c5;
+    --blue-2: #2459db;
+    --page: #f3f5f9;
+    --surface: #ffffff;
+    --border: #e2e7ef;
+    --text: #172033;
+    --muted: #758096;
+    --green: #1fa968;
+    --green-bg: #e7f6ee;
+    --red: #df4d58;
+    --red-bg: #fdebed;
+    --yellow: #b78112;
+    --yellow-bg: #fff4d9;
+    --gray-bg: #eef1f5;
+    --shadow: 0 2px 10px rgba(22, 42, 82, .045);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 82px; }
+body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+}
+.app-shell { min-height: 100vh; }
+.sidebar {
+    position: fixed; inset: 0 auto 0 0; z-index: 20;
+    width: 236px; background: #fff; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 22px 15px 18px;
+    overflow-y: auto;
+}
+.sidebar-brand { display: flex; align-items: center; gap: 11px; padding: 2px 8px 22px; }
+.sidebar-mark {
+    width: 42px; height: 42px; display: grid; place-items: center;
+    background: var(--blue); color: #fff; border-radius: 11px;
+    font-size: 18px; font-weight: 800; box-shadow: 0 5px 12px #1746c533;
+}
+.sidebar-brand strong { display: block; color: #17233c; font-size: 17px; letter-spacing: -.35px; }
+.sidebar-brand small { display: block; color: var(--muted); font-size: 9px; letter-spacing: .75px; margin-top: 4px; }
+.sidebar-caption { padding: 9px 11px 8px; color: #9aa3b3; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+.sidebar-nav { display: grid; gap: 5px; }
+.sidebar-nav a {
+    display: flex; align-items: center; gap: 11px; min-height: 42px;
+    padding: 10px 12px; color: #59657a; text-decoration: none;
+    border-radius: 7px; font-size: 13px; transition: .15s ease;
+}
+.sidebar-nav a .nav-icon { width: 19px; text-align: center; font-size: 16px; }
+.sidebar-nav a:hover { background: #f1f5ff; color: var(--blue); }
+.sidebar-nav a.active { background: var(--blue); color: #fff; font-weight: 700; box-shadow: 0 4px 10px #1746c52b; }
+.sidebar-footer { margin-top: auto; padding: 16px 10px 2px; border-top: 1px solid #edf0f5; color: #8993a5; font-size: 11px; line-height: 1.7; }
+.sidebar-footer b { color: #536078; }
+.main-area { min-height: 100vh; margin-left: 236px; }
+.topbar {
+    min-height: 62px; position: sticky; top: 0; z-index: 15;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 10px 28px; background: var(--blue); color: #fff;
+    box-shadow: 0 2px 7px rgba(16, 42, 100, .12);
+}
+.topbar .brand { display: flex; align-items: center; gap: 11px; }
+.topbar .brand-icon {
+    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+    background: rgba(255,255,255,.16); color: #fff; font-size: 16px; font-weight: 800;
+}
+.topbar h1 { margin: 0; color: #fff; font-size: 17px; font-weight: 700; }
+.topbar .subtitle { color: rgba(255,255,255,.72); font-size: 10px; margin-top: 3px; letter-spacing: .35px; }
+.connection {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 34px;
+    padding: 7px 12px; border: 1px solid rgba(255,255,255,.22);
+    border-radius: 20px; background: rgba(255,255,255,.12); color: #fff; font-size: 11px;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #ffd166; box-shadow: 0 0 0 3px rgba(255,255,255,.12); }
+.dot.online { background: #65e3a4; }
+.dot.offline { background: #ff8a8a; }
+.page-content { width: min(1500px, 100%); margin: 0 auto; padding: 0; }
+.page-content-inner { padding: 25px 28px 42px; }
+.page-heading { display: flex; justify-content: space-between; align-items: end; gap: 14px; margin: 0 0 18px; }
+.page-heading h2 { margin: 0; font-size: 21px; font-weight: 700; color: #18243b; }
+.page-heading p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.grid { display: grid; gap: 15px; }
+.stats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 17px; }
+.two-col { grid-template-columns: 1.05fr .95fr; }
+.card {
+    min-width: 0; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 18px 19px; margin-bottom: 17px;
+    box-shadow: var(--shadow);
+}
+.stats .card { min-height: 113px; margin-bottom: 0; border-radius: 7px; padding: 16px 18px; }
+.stat-label { color: #6f7b90; font-size: 12px; }
+.stat-value { font-size: 29px; font-weight: 750; margin-top: 10px; color: #17243b; }
+.stat-note { color: #929bad; font-size: 11px; margin-top: 5px; line-height: 1.45; }
+.green { color: var(--green) !important; }
+.red { color: var(--red) !important; }
+.yellow { color: var(--yellow) !important; }
+.blue { color: var(--blue) !important; }
+.section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 15px; }
+h2 { margin: 0; font-size: 15px; color: #26334a; }
+.muted { color: var(--muted); font-size: 11px; }
+.slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 11px; }
+.slot {
+    min-width: 0; padding: 15px 8px 13px; text-align: center;
+    border: 1px solid var(--border); border-radius: 7px; background: #f8faff;
+    position: relative; overflow: hidden;
+}
+.slot:before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: #aab3c1; }
+.slot.free { border-color: #b9e7ce; background: var(--green-bg); }
+.slot.free:before { background: var(--green); }
+.slot.occupied { border-color: #f3c1c5; background: var(--red-bg); }
+.slot.occupied:before { background: var(--red); }
+.slot.reserved { border-color: #f0dfae; background: var(--yellow-bg); }
+.slot.reserved:before { background: #d7a32a; }
+.slot.unknown { border-color: var(--border); background: #f4f5f7; }
+.slot-name { font-weight: 800; font-size: 14px; color: #27334a; }
+.slot-icon { font-size: 28px; margin: 10px 0 8px; min-height: 32px; }
+.slot.free .slot-icon { opacity: .38; }
+.slot-state { font-size: 10px; font-weight: 700; line-height: 1.45; overflow-wrap: anywhere; color: #59677d; }
+.road { height: 47px; margin: 15px 0; display: grid; place-items: center; border-radius: 5px; background: #e9edf4; position: relative; color: #68758a; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; overflow: hidden; }
+.road:before { content: ""; position: absolute; width: 100%; border-top: 2px dashed #aab4c3; }
+.road span { position: relative; background: #e9edf4; padding: 6px 12px; }
+.gates { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.gate { display: flex; align-items: center; gap: 11px; padding: 12px; background: #f8faff; border: 1px solid var(--border); border-radius: 7px; }
+.gate.open { border-color: #b9e7ce; background: #f1fbf5; }
+.gate.closed { border-color: #f0dfae; }
+.gate-icon { width: 38px; height: 38px; display: grid; place-items: center; background: #e8eefb; color: var(--blue); border-radius: 8px; font-size: 19px; }
+.gate-name { font-weight: 700; font-size: 12px; margin-bottom: 5px; color: #28354b; }
+.gate-status { font-size: 11px; color: var(--muted); }
+.gate.open .gate-status { color: var(--green); font-weight: 700; }
+.guidance { display: flex; align-items: center; gap: 13px; padding: 15px; border-radius: 7px; background: #eff7ff; border: 1px solid #d8e8ff; }
+.guidance-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 8px; background: #dceaff; color: var(--blue); font-size: 20px; }
+.guidance-title { font-weight: 700; margin-bottom: 5px; color: #244b9e; }
+.guidance-text { color: #5c6f91; font-size: 12px; line-height: 1.5; }
+form { display: grid; gap: 12px; }
+label { display: block; color: #68758a; font-size: 11px; font-weight: 700; margin-bottom: 6px; }
+input, select { width: 100%; min-height: 40px; padding: 9px 11px; background: #fff; color: var(--text); border: 1px solid #dce2eb; border-radius: 5px; outline: none; }
+input:focus, select:focus { border-color: #7ea3f7; box-shadow: 0 0 0 3px #2459db15; }
+button { padding: 10px 14px; border: 0; border-radius: 5px; background: var(--blue); color: white; font-weight: 700; font-size: 12px; cursor: pointer; min-height: 38px; transition: .15s; }
+button:hover { background: var(--blue-2); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.secondary { background: #e8edf5; color: #46546c; }
+button.secondary:hover { background: #dce4ef; }
+button.danger { background: #fae9eb; color: #bc3947; }
+button.danger:hover { background: #f6d9dd; }
+button.small { min-height: 29px; padding: 6px 9px; font-size: 10px; }
+.message { min-height: 18px; font-size: 11px; line-height: 1.5; }
+.message.ok { color: #16864f; }
+.message.error { color: #cc3345; }
+.registered-card-list { display: grid; gap: 8px; max-height: 220px; overflow: auto; }
+.registered-card-item { background: #f6f8fc; border: 1px solid var(--border); border-radius: 6px; padding: 10px 11px; overflow-wrap: anywhere; }
+.registered-card-item strong { display: block; font-size: 12px; color: #28354b; margin-bottom: 3px; }
+.reservation-list { display: grid; gap: 9px; }
+.reservation-item { background: #f8faff; border: 1px solid var(--border); border-radius: 7px; padding: 12px; }
+.reservation-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.reservation-meta { color: var(--muted); font-size: 11px; line-height: 1.7; margin-top: 7px; }
+.pill { display: inline-block; padding: 4px 8px; border-radius: 20px; font-size: 10px; background: #edf1f7; }
+.pill.booked { color: #9a6a06; background: #fff4d9; }
+.pill.cancelled { color: #7d8797; background: #edf0f4; }
+.pill.expired { color: #a44a52; background: #fdebed; }
+.table-wrap { width: 100%; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+th, td { text-align: left; padding: 10px 9px; border-bottom: 1px solid #edf0f5; white-space: nowrap; }
+th { color: #78849a; font-weight: 700; background: #fafbfd; }
+tbody tr:hover { background: #f8faff; }
+.empty { padding: 17px 8px; color: var(--muted); font-size: 12px; text-align: center; }
+.footer { margin-top: 13px; color: #8a94a5; font-size: 10px; line-height: 1.7; }
+.legend { display: flex; flex-wrap: wrap; gap: 13px; margin-top: 14px; color: var(--muted); font-size: 10px; }
+.legend i { display: inline-block; height: 8px; width: 8px; border-radius: 50%; margin-right: 5px; }
+#last-rfid-panel .stat-value { font-family: Consolas, monospace; letter-spacing: .5px; }
+#last-rfid-panel { border-left: 4px solid #7da4f5; }
+#rfid-card-registration { border-top: 3px solid var(--blue); }
+#reservation-form .grid { align-items: end; }
+section[id], div[id] { scroll-margin-top: 82px; }
+@media (max-width: 1100px) {
+    .sidebar { width: 205px; }
+    .main-area { margin-left: 205px; }
+    .page-content-inner { padding: 22px 20px 36px; }
+    .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 760px) {
+    .sidebar { position: static; width: 100%; padding: 12px 14px; border-right: 0; border-bottom: 1px solid var(--border); }
+    .sidebar-brand { padding: 0 4px 10px; }
+    .sidebar-caption, .sidebar-footer { display: none; }
+    .sidebar-nav { display: flex; overflow-x: auto; gap: 6px; padding-bottom: 2px; }
+    .sidebar-nav a { flex: 0 0 auto; min-height: 36px; padding: 8px 10px; font-size: 11px; }
+    .main-area { margin-left: 0; }
+    .topbar { position: static; padding: 10px 15px; }
+    .page-content-inner { padding: 18px 13px 30px; }
+    .two-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+    .topbar { align-items: flex-start; }
+    .topbar .subtitle { max-width: 220px; line-height: 1.4; }
+    .connection { font-size: 0; padding: 8px; }
+    .connection .dot { margin: 0; }
+    .stats { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+    .stats .card { min-height: 100px; padding: 13px; }
+    .stat-value { font-size: 25px; }
+    .slots { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+    .gates { grid-template-columns: 1fr; }
+    .card { padding: 14px; }
+    .page-heading h2 { font-size: 18px; }
+}
+</style>
+</head>
+
+<body>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="sidebar-mark">P</div>
+            <div><strong>Smart Parking</strong><small>THE SMART PARKING SYSTEM</small></div>
+        </div>
+        <div class="sidebar-caption">QUẢN LÝ BÃI ĐỖ XE</div>
+        <nav class="sidebar-nav" aria-label="Điều hướng chính">
+            <a class="active" href="#dashboard"><span class="nav-icon">▦</span>Dashboard</a>
+            <a href="#parking-section"><span class="nav-icon">▤</span>Vị trí đỗ xe</a>
+            <a href="#guidance-section"><span class="nav-icon">➤</span>Chỉ dẫn đỗ xe</a>
+            <a href="#rfid-card-registration"><span class="nav-icon">▣</span>Quản lý thẻ RFID</a>
+            <a href="#reservation-section"><span class="nav-icon">▦</span>Đặt chỗ</a>
+            <a href="#events-section"><span class="nav-icon">≡</span>Lịch sử hoạt động</a>
+            <a href="#statistics-section"><span class="nav-icon">▥</span>Thống kê</a>
+        </nav>
+        <div class="sidebar-footer"><b>EDGE DEVICE</b><br>Raspberry Pi 4B<br>Hệ thống quản lý bãi đỗ xe</div>
+    </aside>
+    <div class="main-area">
+<div class="page-content">
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-icon">P</div>
+            <div>
+                <h1>Hệ thống quản lý bãi đỗ xe</h1>
+                <div class="subtitle">GIÁM SÁT VÀ QUẢN LÝ THỜI GIAN THỰC · RASPBERRY PI 4B</div>
+            </div>
+        </div>
+        <div class="connection">
+            <span class="dot" id="connection-dot"></span>
+            <span id="connection-text">Đang tải dữ liệu...</span>
+        </div>
+    </header>
+
+    <main class="page-content-inner">
+    <div class="page-heading">
+        <div><h2>Tổng quan bãi đỗ xe</h2><p>Theo dõi trạng thái vị trí, cổng và hoạt động vận hành.</p></div>
+    </div>
+
+    <section class="grid stats" id="dashboard">
+        <div class="card">
+            <div class="stat-label">Tổng vị trí</div>
+            <div class="stat-value blue" id="total-count">5</div>
+            <div class="stat-note">Ô đỗ vật lý</div>
+        </div>
+        <div class="card">
+            <div class="stat-label">Ô trống</div>
+            <div class="stat-value green" id="free-count">--</div>
+            <div class="stat-note">Có thể chỉ dẫn vào</div>
+        </div>
+        <div class="card">
+            <div class="stat-label">Có xe</div>
+            <div class="stat-value red" id="occupied-count">--</div>
+            <div class="stat-note">Đọc từ cảm biến IR</div>
+        </div>
+        <div class="card">
+            <div class="stat-label">Đang đặt chỗ</div>
+            <div class="stat-value yellow" id="reserved-count">--</div>
+            <div class="stat-note">Đặt chỗ có hiệu lực hiện tại</div>
+        </div>
+    </section>
+
+    <section class="card" id="parking-section">
+        <div class="section-head">
+            <h2>Sơ đồ vị trí đỗ xe</h2>
+            <span class="muted">Tự làm mới mỗi 2 giây</span>
+        </div>
+
+        <div class="slots" id="slots">
+            <div class="empty">Đang tải trạng thái...</div>
+        </div>
+
+        <div class="road"><span>LÀN XE DI CHUYỂN</span></div>
+
+        <div class="gates">
+            <div class="gate" id="gate-entry">
+                <div class="gate-icon">↘</div>
+                <div>
+                    <div class="gate-name">Cổng vào</div>
+                    <div class="gate-status" id="entry-status">Chưa xác định</div>
+                </div>
+            </div>
+            <div class="gate" id="gate-exit">
+                <div class="gate-icon">↗</div>
+                <div>
+                    <div class="gate-name">Cổng ra</div>
+                    <div class="gate-status" id="exit-status">Chưa xác định</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="legend">
+            <span><i style="background:var(--green)"></i>Ô trống</span>
+            <span><i style="background:var(--red)"></i>Có xe</span>
+            <span><i style="background:var(--yellow)"></i>Đặt chỗ</span>
+            <span><i style="background:#7b8da7"></i>Chưa xác định</span>
+        </div>
+    </section>
+
+
+    <section class="card" id="last-rfid-panel" aria-live="polite">
+        <div class="section-head">
+            <h2>UID RFID vừa quét mở cổng</h2>
+            <span class="muted">Cập nhật tự động mỗi 2 giây</span>
+        </div>
+        <div class="stat-label">Thẻ hợp lệ gần nhất đã mở barie</div>
+        <div class="stat-value blue" id="last-rfid-uid" style="font-size:26px;overflow-wrap:anywhere">
+            Chưa có lượt quét mở cổng
+        </div>
+        <div class="stat-note" id="last-rfid-details">Cổng: — · Kết quả: — · Thời gian: —</div>
+    </section>
+
+    <section class="grid two-col" id="guidance-section">
+        <div class="card">
+            <div class="section-head">
+                <h2>Hướng dẫn vị trí đỗ xe</h2>
+                <span class="muted">Chỉ dẫn vị trí</span>
+            </div>
+            <div class="guidance">
+                <div class="guidance-icon">➜</div>
+                <div>
+                    <div class="guidance-title" id="guidance-title">Đang tính vị trí...</div>
+                    <div class="guidance-text" id="guidance-text">
+                        Đang đọc dữ liệu các ô đỗ.
+                    </div>
+                </div>
+            </div>
+            <div class="footer">
+                Chỉ dẫn chọn ô đang trống đầu tiên theo thứ tự P1–P5,
+                bỏ qua ô có xe và ô đang được đặt chỗ.
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-head">
+                <h2>Thống kê hôm nay</h2>
+                <span class="muted" id="today-date">--</span>
+            </div>
+            <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px">
+                <div>
+                    <div class="stat-label">Lượt vào</div>
+                    <div class="stat-value blue" id="today-entries">--</div>
+                </div>
+                <div>
+                    <div class="stat-label">Lượt ra</div>
+                    <div class="stat-value blue" id="today-exits">--</div>
+                </div>
+                <div>
+                    <div class="stat-label">Doanh thu</div>
+                    <div class="stat-value green" style="font-size:23px" id="today-revenue">--</div>
+                </div>
+                <div>
+                    <div class="stat-label">Phiên đang hoạt động</div>
+                    <div class="stat-value yellow" id="active-sessions">--</div>
+                </div>
+            </div>
+            <div class="footer">
+                Phi đỗ mẫu: 5.000 VND/giờ hoặc phần lẻ giờ.
+                Doanh thu được tính từ các sự kiện EXIT trong CSV.
+            </div>
+        </div>
+    </section>
+
+    <section class="card" id="rfid-card-registration">
+        <div class="section-head">
+            <h2>RFID · Đăng ký thẻ</h2>
+            <span class="muted">Quét một lần, dùng nhiều lần đặt chỗ</span>
+        </div>
+        <div class="grid two-col">
+            <div>
+                <label for="card-name">Tên gợi nhớ của thẻ</label>
+                <input id="card-name" type="text" maxlength="40" placeholder="Ví dụ: Xe gia đình">
+                <label for="card-uid" style="margin-top:12px">UID vừa đọc</label>
+                <input id="card-uid" type="text" maxlength="32" placeholder="Bấm Đọc UID từ thẻ" readonly>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+                    <button id="scan-card-button" type="button">Đọc UID từ thẻ</button>
+                    <button id="save-card-button" class="secondary" type="button">Lưu thẻ</button>
+                </div>
+                <div id="card-message" class="message" aria-live="polite" style="margin-top:10px">
+                    Đưa thẻ gần RC522 cổng vào khi được yêu cầu. Chức năng này không mở barie.
+                </div>
+            </div>
+            <div>
+                <div class="stat-label" style="margin-bottom:10px">Danh sách thẻ đã đăng ký</div>
+                <div id="registered-card-list" class="registered-card-list">
+                    <div class="muted">Đang tải danh sách thẻ…</div>
+                </div>
+                <div class="stat-note" style="margin-top:10px">
+                    UID được lưu trên Raspberry Pi trong parking_cards.json. Khi đặt chỗ, chọn thẻ từ danh sách bên dưới; không cần quét lại.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card" id="reservation-section">
+        <div class="section-head">
+            <h2>Đặt chỗ</h2>
+            <span class="muted">Thời lượng tối đa 4 giờ mỗi lượt</span>
+        </div>
+
+        <form id="reservation-form">
+            <div class="grid two-col">
+                <div>
+                    <label for="reserve-slot">Vị trí muốn đặt</label>
+                    <select id="reserve-slot" required>
+                        <option value="">Chọn vị trí trống</option>
+                        <option value="P1">P1</option>
+                        <option value="P2">P2</option>
+                        <option value="P3">P3</option>
+                        <option value="P4">P4</option>
+                        <option value="P5">P5</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="reserve-uid">Thẻ RFID đã đăng ký</label>
+                    <select id="reserve-uid" required>
+                        <option value="">Đang tải danh sách thẻ…</option>
+                    </select>
+                    <div class="stat-note">Chọn thẻ đã lưu; không cần quét lại mỗi lần đặt chỗ.</div>
+                </div>
+                <div>
+                    <label for="reserve-start">Thời gian bắt đầu</label>
+                    <input id="reserve-start" type="datetime-local" required>
+                </div>
+                <div>
+                    <label for="reserve-end">Thời gian kết thúc</label>
+                    <input id="reserve-end" type="datetime-local" required>
+                </div>
+                <div style="display:flex;align-items:end">
+                    <button id="reserve-submit" type="submit" style="width:100%">
+                        Xác nhận đặt chỗ
+                    </button>
+                </div>
+            </div>
+            <div id="reservation-message" class="message"></div>
+        </form>
+
+        <div class="footer">
+            Trạng thái đặt chỗ hiện được quản lý trong Digital Twin.
+            Muốn khóa chỗ và ngăn xe khác vào ô đó trên phần cứng,
+            cần tích hợp file đặt chỗ vào logic chấp nhận xe của bộ điều khiển.
+        </div>
+
+        <div class="section-head" style="margin-top:24px">
+            <h2>Danh sách đặt chỗ</h2>
+            <span class="muted" id="reservation-count">0 lượt</span>
+        </div>
+        <div id="reservations-list" class="reservation-list">
+            <div class="empty">Chưa có dữ liệu đặt chỗ.</div>
+        </div>
+    </section>
+
+    <section class="card" id="statistics-section">
+        <div class="section-head">
+            <h2>Thống kê tổng hợp</h2>
+            <span class="muted">Dựa trên lịch sử CSV</span>
+        </div>
+        <div class="grid stats">
+            <div>
+                <div class="stat-label">Tổng phiên hoàn tất</div>
+                <div class="stat-value blue" id="total-sessions">--</div>
+            </div>
+            <div>
+                <div class="stat-label">Thời gian đỗ trung bình</div>
+                <div class="stat-value blue" style="font-size:23px" id="average-duration">--</div>
+            </div>
+            <div>
+                <div class="stat-label">Ô chưa xác định</div>
+                <div class="stat-value yellow" id="unknown-count">--</div>
+            </div>
+            <div>
+                <div class="stat-label">Cập nhật gần nhất</div>
+                <div class="stat-value" style="font-size:15px" id="updated-at">Chưa có</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card" id="events-section">
+        <div class="section-head">
+            <h2>Lịch sử hoạt động gần đây</h2>
+            <span class="muted">Tối đa 12 sự kiện mới nhất</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sự kiện</th>
+                        <th>Vị trí</th>
+                        <th>Thời gian</th>
+                        <th>Thời lượng</th>
+                        <th>Phí</th>
+                    </tr>
+                </thead>
+                <tbody id="events-table">
+                    <tr><td colspan="5" class="empty">Đang tải lịch sử...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="footer">
+        Nguồn dữ liệu: Raspberry Pi → parking_live.json,
+        parking_data.json và parking_history.csv.<br>
+        Dashboard chỉ hiển thị trạng thái và quản lý đặt chỗ;
+        không trực tiếp điều khiển GPIO, RFID hoặc servo.
+        Không chuyển tiếp cổng 5000 ra Internet công cộng.
+    </div>
+</main>
+</div>
+</div>
+</div>
+
+<script>
+const slotNames = ["P1", "P2", "P3", "P4", "P5"];
+
+const slotLabels = {
+    FREE: "Ô TRỐNG",
+    OCCUPIED: "CÓ XE",
+    RESERVED: "ĐÃ ĐẶT",
+    UNKNOWN: "CHƯA XÁC ĐỊNH"
+};
+
+let latestStatus = null;
+
+function element(id) {
+    return document.getElementById(id);
+}
+
+function setText(id, value) {
+    element(id).textContent = value;
+}
+
+function money(value) {
+    return Number(value || 0).toLocaleString("vi-VN") + " đ";
+}
+
+function durationText(value) {
+    let seconds = Math.max(0, Number(value || 0));
+    const hours = Math.floor(seconds / 3600);
+    seconds %= 3600;
+    const minutes = Math.floor(seconds / 60);
+
+    if (hours > 0) return hours + " giờ " + minutes + " phút";
+    return minutes + " phút";
+}
+
+function dateText(value) {
+    if (!value) return "--";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString("vi-VN");
+}
+
+function localInputValue(date) {
+    const pad = number => String(number).padStart(2, "0");
+    return date.getFullYear() + "-" +
+        pad(date.getMonth() + 1) + "-" +
+        pad(date.getDate()) + "T" +
+        pad(date.getHours()) + ":" +
+        pad(date.getMinutes());
+}
+
+function setDefaultReservationTime() {
+    const start = new Date(Date.now() + 5 * 60 * 1000);
+    start.setSeconds(0, 0);
+
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+    element("reserve-start").value = localInputValue(start);
+    element("reserve-end").value = localInputValue(end);
+}
+
+function buildSlots(slots) {
+    const container = element("slots");
+    container.replaceChildren();
+
+    for (const name of slotNames) {
+        const state = slots[name] || "UNKNOWN";
+        const card = document.createElement("div");
+        card.className = "slot " + state.toLowerCase();
+
+        const heading = document.createElement("div");
+        heading.className = "slot-name";
+        heading.textContent = name;
+
+        const icon = document.createElement("div");
+        icon.className = "slot-icon";
+        icon.textContent =
+            state === "FREE" ? "—" :
+            state === "OCCUPIED" ? "🚗" :
+            state === "RESERVED" ? "🅿️" : "?";
+
+        const label = document.createElement("div");
+        label.className = "slot-state";
+        label.textContent = slotLabels[state] || slotLabels.UNKNOWN;
+
+        card.append(heading, icon, label);
+        container.appendChild(card);
+    }
+
+    const select = element("reserve-slot");
+    const selected = select.value;
+
+    for (const option of select.options) {
+        if (!option.value) continue;
+
+        const state = slots[option.value] || "UNKNOWN";
+        option.disabled = state !== "FREE";
+        option.textContent = option.value + " — " +
+            (slotLabels[state] || slotLabels.UNKNOWN);
+    }
+
+    if (selected && slots[selected] === "FREE") {
+        select.value = selected;
+    } else if (selected) {
+        select.value = "";
+    }
+}
+
+function updateGate(id, statusId, state) {
+    const gate = element(id);
+    gate.className = "gate " + (state || "UNKNOWN").toLowerCase();
+
+    const labels = {
+        OPEN: "ĐANG MỞ",
+        CLOSED: "ĐANG ĐÓNG",
+        UNKNOWN: "CHƯA XÁC ĐỊNH"
+    };
+
+    setText(statusId, labels[state] || labels.UNKNOWN);
+}
+
+function buildReservations(rows) {
+    const container = element("reservations-list");
+    container.replaceChildren();
+
+    const visible = (rows || []).filter(row =>
+        ["BOOKED", "CANCELLED", "EXPIRED"].includes(row.status)
+    );
+
+    setText("reservation-count", visible.length + " lượt");
+
+    if (!visible.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "Chưa có đặt chỗ.";
+        container.appendChild(empty);
+        return;
+    }
+
+    for (const row of visible) {
+        const item = document.createElement("div");
+        item.className = "reservation-item";
+
+        const top = document.createElement("div");
+        top.className = "reservation-top";
+
+        const title = document.createElement("strong");
+        title.textContent = row.slot + " · " + row.id;
+
+        const pill = document.createElement("span");
+        pill.className = "pill " + row.status.toLowerCase();
+        pill.textContent =
+            row.status === "BOOKED" ? "ĐÃ ĐẶT" :
+            row.status === "CANCELLED" ? "ĐÃ HỦY" : "HẾT HẠN";
+
+        top.append(title, pill);
+
+        const meta = document.createElement("div");
+        meta.className = "reservation-meta";
+        meta.textContent = "Từ: " + dateText(row.start) +
+            " · Đến: " + dateText(row.end);
+
+        item.append(top, meta);
+
+        if (row.status === "BOOKED") {
+            const cancel = document.createElement("button");
+            cancel.className = "danger small";
+            cancel.style.marginTop = "10px";
+            cancel.textContent = "Hủy đặt chỗ";
+            cancel.addEventListener("click", () => cancelReservation(row.id));
+            item.appendChild(cancel);
+        }
+
+        container.appendChild(item);
+    }
+}
+
+function buildEvents(events) {
+    const body = element("events-table");
+    body.replaceChildren();
+
+    if (!events || !events.length) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 5;
+        cell.className = "empty";
+        cell.textContent = "Chưa có sự kiện trong lịch sử.";
+        row.appendChild(cell);
+        body.appendChild(row);
+        return;
+    }
+
+    for (const event of events) {
+        const row = document.createElement("tr");
+
+        const values = [
+            event.event || "--",
+            event.slot || "--",
+            dateText(event.timestamp),
+            durationText(event.parking_seconds),
+            money(event.fee_vnd)
+        ];
+
+        for (const value of values) {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            row.appendChild(cell);
+        }
+
+        body.appendChild(row);
+    }
+}
+
+function updateGuidance(data) {
+    if (!data.source_loaded) {
+        setText("guidance-title", "Đang chờ cảm biến");
+        setText("guidance-text",
+            "Chưa nhận đủ trạng thái 5 ô. Kiểm tra chương trình phần cứng.");
+        return;
+    }
+
+    if (data.guidance_slot) {
+        setText("guidance-title", "Gợi ý vị trí " + data.guidance_slot);
+        setText("guidance-text",
+            "Vị trí này đang trống. Hãy di chuyển xe theo làn tới " +
+            data.guidance_slot + ".");
+    } else if (data.unknown_count > 0) {
+        setText("guidance-title", "Chưa đủ dữ liệu");
+        setText("guidance-text",
+            "Có ô chưa xác định nên hệ thống chưa kết luận được vị trí phù hợp.");
+    } else {
+        setText("guidance-title", "Không có ô trống");
+        setText("guidance-text",
+            "Tất cả vị trí đã có xe hoặc đang được đặt chỗ.");
+    }
+}
+
+async function refreshDashboard() {
+    try {
+        const response = await fetch(
+            "/api/status?t=" + Date.now(),
+            { cache: "no-store" }
+        );
+
+        if (!response.ok) throw new Error("API error");
+
+        const raw = await response.json();
+
+        // Tuong thich ca API dashboard nay va backend Digital Twin dang dung tren Pi.
+        const slotMap = {};
+        if (Array.isArray(raw.slots)) {
+            raw.slots.forEach(item => {
+                if (item && item.id) slotMap[item.id] = item.status || "UNKNOWN";
+            });
+        } else {
+            Object.assign(slotMap, raw.slots || {});
+        }
+
+        const unknownCount = raw.unknown_count ??
+            Object.values(slotMap).filter(v => v === "UNKNOWN").length;
+        const guidanceText = String(raw.guidance || "");
+        const guidanceMatch = guidanceText.match(/(?:Gợi ý chỗ đỗ|Gợi ý vị trí)\s*:?\s*(P[1-5])/i);
+        const statsRaw = raw.statistics || {};
+        const normalizedStats = {
+            today_entries: statsRaw.today_entries ?? statsRaw.entries_today ?? 0,
+            today_exits: statsRaw.today_exits ?? statsRaw.exits_today ?? 0,
+            today_revenue: statsRaw.today_revenue ?? statsRaw.fees_today ?? 0,
+            active_sessions: statsRaw.active_sessions ?? raw.session_count ?? 0,
+            total_sessions: statsRaw.total_sessions ?? statsRaw.completed_sessions ?? 0,
+            average_duration_seconds: statsRaw.average_duration_seconds ?? statsRaw.avg_parking_seconds ?? null
+        };
+
+        const statusAliases = {
+            "SẮP ĐẾN": "BOOKED", "ĐANG HIỆU LỰC": "BOOKED",
+            "ĐÃ ĐẾN CỔNG": "ARRIVED", "ĐANG ĐỖ": "IN_USE",
+            "HOÀN THÀNH": "COMPLETED", "ĐÃ HỦY": "CANCELLED", "HẾT HẠN": "EXPIRED"
+        };
+        const reservations = (raw.reservations || []).map(item => ({
+            ...item,
+            status: statusAliases[item.status] || item.status || "BOOKED"
+        }));
+
+        const historyRows = raw.events || raw.history || [];
+        const events = historyRows.map(item => ({
+            ...item,
+            timestamp: item.timestamp || item.time || item.updated_at || "",
+            parking_seconds: item.parking_seconds ?? item.duration_seconds ?? 0,
+            fee_vnd: item.fee_vnd ?? item.fee ?? 0
+        }));
+
+        const data = {
+            ...raw,
+            source_loaded: raw.source_loaded ?? raw.sensor_ready ?? false,
+            updated_at: raw.updated_at ?? raw.updated ?? raw.updated_at,
+            total_slots: raw.total_slots ?? 5,
+            free_count: raw.free_count ?? raw.free ?? "--",
+            occupied_count: raw.occupied_count ?? raw.occupied ?? "--",
+            reserved_count: raw.reserved_count ?? 0,
+            unknown_count: unknownCount,
+            slots: slotMap,
+            gates: raw.gates || { entry: raw.entry_gate || "UNKNOWN", exit: raw.exit_gate || "UNKNOWN" },
+            guidance_slot: raw.guidance_slot || (guidanceMatch ? guidanceMatch[1].toUpperCase() : null),
+            statistics: normalizedStats,
+            reservations,
+            events,
+            last_rfid: raw.last_rfid || {}
+        };
+        latestStatus = data;
+        renderRegisteredCards(data.cards || []);
+
+        const lastRFID = data.last_rfid || {};
+        setText("last-rfid-uid", lastRFID.uid || "Chưa có lượt quét mở cổng");
+        setText("last-rfid-details",
+            "Cổng: " + (lastRFID.gate || "—") +
+            " · Kết quả: " + (lastRFID.result || "—") +
+            " · Thời gian: " + (lastRFID.time || "—"));
+
+        element("connection-dot").className =
+            "dot " + (data.source_loaded ? "online" : "");
+
+        setText("connection-text",
+            data.source_loaded
+                ? "Đang đọc dữ liệu phần cứng"
+                : "Chờ dữ liệu phần cứng");
+
+        setText("total-count", data.total_slots ?? 5);
+        setText("free-count", data.free_count ?? "--");
+        setText("occupied-count", data.occupied_count ?? "--");
+        setText("reserved-count", data.reserved_count ?? "--");
+        setText("unknown-count", data.unknown_count ?? "--");
+
+        buildSlots(data.slots || {});
+        updateGate("gate-entry", "entry-status",
+            (data.gates || {}).entry || "UNKNOWN");
+        updateGate("gate-exit", "exit-status",
+            (data.gates || {}).exit || "UNKNOWN");
+
+        updateGuidance(data);
+
+        const stats = data.statistics || {};
+        setText("today-entries", stats.today_entries ?? 0);
+        setText("today-exits", stats.today_exits ?? 0);
+        setText("today-revenue", money(stats.today_revenue));
+        setText("active-sessions", stats.active_sessions ?? 0);
+        setText("total-sessions", stats.total_sessions ?? 0);
+        setText("average-duration",
+            durationText(stats.average_duration_seconds));
+
+        setText("today-date", new Date().toLocaleDateString("vi-VN"));
+        setText("updated-at", dateText(data.updated_at));
+
+        buildReservations(data.reservations || []);
+        buildEvents(data.events || []);
+
+    } catch (error) {
+        element("connection-dot").className = "dot offline";
+        setText("connection-text", "Không kết nối được dashboard");
+    }
+}
+
+function showMessage(message, isError) {
+    const target = element("reservation-message");
+    target.textContent = message;
+    target.className = "message " + (isError ? "error" : "ok");
+}
+
+
+function setCardMessage(message, isError = false) {
+    const target = element("card-message");
+    target.textContent = message;
+    target.className = "message " + (isError ? "error" : "ok");
+}
+
+function renderRegisteredCards(cards) {
+    const select = element("reserve-uid");
+    const previousUid = select.value;
+    const validCards = Array.isArray(cards) ? cards.filter(card => card && card.uid) : [];
+
+    select.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = validCards.length ? "Chọn thẻ đã đăng ký" : "Chưa có thẻ — đăng ký ở phía trên";
+    select.appendChild(placeholder);
+
+    validCards.forEach(card => {
+        const uid = String(card.uid).replace(/[\s:-]/g, "").toUpperCase();
+        const option = document.createElement("option");
+        option.value = uid;
+        option.textContent = (card.name || ("Thẻ " + uid)) + " — " + uid;
+        select.appendChild(option);
+    });
+    if (validCards.some(card => String(card.uid).replace(/[\s:-]/g, "").toUpperCase() === previousUid)) {
+        select.value = previousUid;
+    }
+
+    const list = element("registered-card-list");
+    list.innerHTML = "";
+    if (!validCards.length) {
+        const empty = document.createElement("div");
+        empty.className = "muted";
+        empty.textContent = "Chưa có thẻ nào được đăng ký.";
+        list.appendChild(empty);
+        return;
+    }
+    validCards.forEach(card => {
+        const row = document.createElement("div");
+        row.className = "registered-card-item";
+        const name = document.createElement("strong");
+        name.textContent = card.name || ("Thẻ " + card.uid);
+        const uid = document.createElement("div");
+        uid.className = "muted";
+        uid.textContent = card.uid;
+        row.append(name, uid);
+        list.appendChild(row);
+    });
+}
+
+async function scanCardForRegistration() {
+    const button = element("scan-card-button");
+    button.disabled = true;
+    element("card-uid").value = "";
+    setCardMessage("Đang gửi yêu cầu đọc thẻ. Đưa thẻ gần RC522 cổng vào trong tối đa 30 giây…");
+    try {
+        const response = await fetch("/api/uid/read", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+            cache: "no-store"
+        });
+        const request = await response.json();
+        if (!response.ok || !request.ok || !request.request_id) {
+            throw new Error(request.message || "Không gửi được yêu cầu đọc UID.");
+        }
+
+        const deadline = Date.now() + 32000;
+        while (Date.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 400));
+            const poll = await fetch(
+                "/api/uid/read/" + encodeURIComponent(request.request_id) + "?t=" + Date.now(),
+                { cache: "no-store" }
+            );
+            const result = await poll.json();
+            if (result.status === "FOUND" && result.uid) {
+                element("card-uid").value = String(result.uid).toUpperCase();
+                setCardMessage("Đã đọc UID " + result.uid + ". Nhập tên thẻ rồi bấm Lưu thẻ.");
+                return;
+            }
+            if (["TIMEOUT", "BUSY", "ERROR"].includes(result.status)) {
+                throw new Error(result.message || "Không đọc được UID. Vui lòng thử lại.");
+            }
+        }
+        throw new Error("Hết thời gian chờ thẻ. Hãy bấm Đọc UID từ thẻ để thử lại.");
+    } catch (error) {
+        setCardMessage(error.message || "Lỗi khi đọc thẻ RFID.", true);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function saveRegisteredCard() {
+    const button = element("save-card-button");
+    const uid = element("card-uid").value.trim().replace(/[\s:-]/g, "").toUpperCase();
+    const name = element("card-name").value.trim();
+    if (!uid) {
+        setCardMessage("Hãy bấm Đọc UID từ thẻ trước.", true);
+        return;
+    }
+    if (!name) {
+        setCardMessage("Hãy nhập tên gợi nhớ cho thẻ.", true);
+        element("card-name").focus();
+        return;
+    }
+
+    button.disabled = true;
+    try {
+        const response = await fetch("/api/cards", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uid, name }),
+            cache: "no-store"
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+            throw new Error(result.message || "Không lưu được thẻ.");
+        }
+        await refreshDashboard();
+        element("reserve-uid").value = uid;
+        setCardMessage(result.message || ("Đã lưu thẻ " + name + " (" + uid + ")."));
+    } catch (error) {
+        setCardMessage(error.message || "Lỗi khi lưu thẻ.", true);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+element("scan-card-button").addEventListener("click", scanCardForRegistration);
+element("save-card-button").addEventListener("click", saveRegisteredCard);
+
+
+element("reservation-form").addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const button = element("reserve-submit");
+    button.disabled = true;
+
+    try {
+        const body = {
+            slot: element("reserve-slot").value,
+            uid: element("reserve-uid").value.trim().replace(/[\s:-]/g, "").toUpperCase(),
+            start: element("reserve-start").value,
+            end: element("reserve-end").value
+        };
+
+        const response = await fetch("/api/reservations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+            throw new Error(result.error || "Không thể đặt chỗ.");
+        }
+
+        showMessage(result.message, false);
+        setDefaultReservationTime();
+        await refreshDashboard();
+
+    } catch (error) {
+        showMessage(error.message, true);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+async function cancelReservation(id) {
+    if (!confirm("Bạn có chắc chắn muốn hủy đặt chỗ này?")) return;
+
+    try {
+        const response = await fetch(
+            "/api/reservations/" + encodeURIComponent(id),
+            { method: "DELETE" }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+            throw new Error(result.error || "Không thể hủy đặt chỗ.");
+        }
+
+        showMessage(result.message, false);
+        await refreshDashboard();
+
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+setDefaultReservationTime();
+refreshDashboard();
+setInterval(refreshDashboard, 2000);
+</script>
+</body>
+</html>

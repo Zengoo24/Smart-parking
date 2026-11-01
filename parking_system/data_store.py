@@ -5,6 +5,7 @@ import json
 import os
 import time
 from datetime import datetime
+import math
 
 from .config import DATA_FILE, HISTORY_FILE, RESERVATIONS_FILE, UID_SCAN_RESULT_FILE
 

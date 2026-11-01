@@ -6,7 +6,7 @@ import RPi.GPIO as GPIO
 DATA595, CLOCK595, LATCH595, OE595 = 17, 22, 23, 5
 PL165, CLOCK165, DATA165 = 24, 20, 21
 
-# LOW = co xe, theo cau hinh IR ban dang dung
+# LOW = co xe, 
 IR_ACTIVE_LEVEL = GPIO.LOW
 IR_DEBOUNCE = 0.20
 
@@ -49,7 +49,7 @@ UID_SCAN_RESULT_FILE = os.path.join(HOME, "parking_uid_result.json")
 
 NO_SHOW_GRACE_SECONDS = 15 * 60
 
-# Ten o tren Digital Twin -> ten o cam bien vat ly.
+# Ten o tren giaao dien -> ten o cam bien vat ly.
 # Giu dung quy uoc dao P1/P5 va P2/P4 cua he thong hien tai.
 DISPLAY_TO_PHYSICAL = {
     "P1": "P5",

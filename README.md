@@ -1,6 +1,6 @@
 # Smart Parking Edge IoT
 
-Hệ thống quản lý bãi đỗ xe thông minh sử dụng Raspberry Pi 4B, Edge Computing và IoT. Mô hình gồm 5 vị trí đỗ, 2 cổng vào/ra, RFID, cảm biến IR, LCD, giao diện web Digital Twin và MQTT.
+Hệ thống quản lý bãi đỗ xe thông minh sử dụng Raspberry Pi 4B, Edge Computing và IoT. Mô hình gồm 5 vị trí đỗ, 2 cổng vào/ra, RFID, cảm biến IR, LCD, giao diện web và MQTT.
 
 ## Cấu trúc dự án
 

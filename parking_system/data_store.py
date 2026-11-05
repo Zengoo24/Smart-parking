@@ -6,7 +6,7 @@ import os
 import time
 from datetime import datetime
 import math
-
+from .config import FEE_PER_HOUR
 from .config import DATA_FILE, HISTORY_FILE, RESERVATIONS_FILE, UID_SCAN_RESULT_FILE
 
 def save_active(active):
@@ -96,10 +96,8 @@ def log_history(event, uid, slot, start_ts, end_ts, fee):
         ])
 
 def calculate_fee(parked_ts, end_ts):
-    if parked_ts is None:
-        return 0
-
-    seconds = max(0.0, float(end_ts) - float(parked_ts))
+    def calculate_fee(start_ts, end_ts):
+    seconds = max(0, end_ts - start_ts)
     return max(1, int(math.ceil(seconds / 3600.0))) * FEE_PER_HOUR
 
 def elapsed_text(start_ts):

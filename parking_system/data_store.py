@@ -1,13 +1,22 @@
+
 """Doc/ghi du lieu phien gui xe, lich su, dat cho va yeu cau UID."""
 
 import csv
 import json
+import math
 import os
 import time
 from datetime import datetime
-import math
-from .config import FEE_PER_HOUR
-from .config import DATA_FILE, HISTORY_FILE, RESERVATIONS_FILE, UID_SCAN_RESULT_FILE
+
+from .config import (
+    DATA_FILE,
+    HISTORY_FILE,
+    RESERVATIONS_FILE,
+    UID_SCAN_RESULT_FILE,
+    FEE_PER_HOUR,
+    NO_SHOW_GRACE_SECONDS,
+)
+
 
 def save_active(active):
     temp = DATA_FILE + ".tmp"
@@ -17,6 +26,7 @@ def save_active(active):
         file.write("\n")
 
     os.replace(temp, DATA_FILE)
+
 
 def load_active():
     if not os.path.exists(DATA_FILE):
@@ -61,6 +71,7 @@ def load_active():
         print("Canh bao doc parking_data.json:", exc, flush=True)
         return {}
 
+
 def log_history(event, uid, slot, start_ts, end_ts, fee):
     exists = os.path.exists(HISTORY_FILE)
     duration = 0
@@ -95,10 +106,18 @@ def log_history(event, uid, slot, start_ts, end_ts, fee):
             fee,
         ])
 
+
 def calculate_fee(parked_ts, end_ts):
-    def calculate_fee(start_ts, end_ts):
-    seconds = max(0, end_ts - start_ts)
-    return max(1, int(math.ceil(seconds / 3600.0))) * FEE_PER_HOUR
+    if parked_ts is None:
+        return 0
+
+    seconds = max(0.0, float(end_ts) - float(parked_ts))
+
+    return max(
+        1,
+        int(math.ceil(seconds / 3600.0))
+    ) * FEE_PER_HOUR
+
 
 def elapsed_text(start_ts):
     if start_ts is None:
@@ -111,6 +130,7 @@ def elapsed_text(start_ts):
     return "{:02d}:{:02d}:{:02d}".format(
         hours, minutes, seconds
     )
+
 
 def save_reservation_records(rows):
     temp_path = RESERVATIONS_FILE + ".tmp"
@@ -126,10 +146,12 @@ def save_reservation_records(rows):
 
     os.replace(temp_path, RESERVATIONS_FILE)
 
+
 def load_reservation_records():
     try:
         with open(RESERVATIONS_FILE, "r", encoding="utf-8") as file:
             data = json.load(file)
+
     except (OSError, json.JSONDecodeError):
         return []
 
@@ -156,6 +178,7 @@ def load_reservation_records():
         try:
             start_ts = float(row["start_ts"])
             end_ts = float(row["end_ts"])
+
         except (KeyError, TypeError, ValueError):
             continue
 
@@ -163,6 +186,7 @@ def load_reservation_records():
 
         if now >= end_ts:
             reason = "RESERVATION_ENDED"
+
         elif now >= start_ts + NO_SHOW_GRACE_SECONDS:
             reason = "NO_SHOW"
 
@@ -179,23 +203,30 @@ def load_reservation_records():
     if changed:
         try:
             save_reservation_records(rows)
+
         except OSError as exc:
             print("Loi cap nhat het han dat cho:", exc, flush=True)
 
     return rows
 
+
 def read_uid_scan_json(path):
     """Read a small JSON request/result file written by Digital Twin."""
     try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
+        with open(path, encoding="utf-8") as file:
+            data = json.load(file)
+
         return data if isinstance(data, dict) else {}
+
     except (OSError, json.JSONDecodeError):
         return {}
 
+
 def write_uid_scan_result(request_id, status, uid="", message=""):
     """Return a scanned UID to Digital Twin without starting an entry/exit flow."""
+
     temp = UID_SCAN_RESULT_FILE + ".tmp"
+
     result = {
         "request_id": request_id,
         "status": status,
@@ -203,9 +234,12 @@ def write_uid_scan_result(request_id, status, uid="", message=""):
         "message": message,
         "updated_ts": time.time(),
     }
+
     try:
-        with open(temp, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False)
+        with open(temp, "w", encoding="utf-8") as file:
+            json.dump(result, file, ensure_ascii=False)
+
         os.replace(temp, UID_SCAN_RESULT_FILE)
+
     except OSError as exc:
         print("Loi ghi ket qua doc UID tu Digital Twin:", exc, flush=True)

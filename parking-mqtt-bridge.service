@@ -1,0 +1,18 @@
+[Unit]
+Description=Smart Parking MQTT Bridge (4 slots)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/Downloads
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/default/parking-mqtt-bridge
+ExecStart=/usr/bin/python3 -u /home/pi/Downloads/parking_mqtt_bridge.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bãi Đỗ Xe Thông Minh</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; }
+    body { background: #e9ecef; padding: 10px; min-height: 100vh; }
+    .container { background: #f5f6fa; border: 2px solid #7f8fa6; border-radius: 8px; overflow: hidden; min-height: calc(100vh - 20px); display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+    .header { background: linear-gradient(180deg,#00a8ff 0%,#0097e6 100%); color: #07111a; text-align: center; font-size: 28px; font-weight: 800; padding: 12px 8px; letter-spacing: 1px; border-bottom: 2px solid #7f8fa6; }
+    .main-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(280px,.92fr); gap: 10px; padding: 10px; flex: 1; min-height: 0; }
+    .panel,.clock-box,.info-panel,.auto-panel { background: #fff; border: 1px solid #8c96a0; border-radius: 4px; }
+    .panel { padding: 8px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .panel-title { text-align: center; font-size: 16px; font-weight: 800; color: #1e272e; padding: 2px 0; }
+    .cam-box { width: 100%; height: clamp(200px,22vw,300px); background: #111; border: 1px solid #7f8fa6; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .cam-box img { width: 100%; height: 100%; object-fit: contain; }
+    .crop-box { width: 92%; height: clamp(110px,16vh,150px); margin: 0 auto; background: #fff; border: 1px solid #7f8fa6; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .crop-box img { width: 100%; height: 100%; object-fit: contain; }
+    .data-row { display: grid; grid-template-columns: 95px minmax(0,1fr); align-items: center; gap: 8px; }
+    .data-label { font-size: 14px; font-weight: 800; color: #1e272e; text-align: right; }
+    .data-value { min-width: 0; min-height: 38px; border: 1px solid #7f8fa6; background: #fff; display: flex; align-items: center; justify-content: center; padding: 4px; overflow-wrap: anywhere; text-align: center; font-size: 17px; font-weight: 800; color: #000; letter-spacing: .4px; }
+    .rfid-value { color: #0056b3; font-size: 15px; }
+    .right-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .clock-box { padding: 10px; text-align: center; font-size: 18px; font-weight: 800; color: #000; }
+    .info-panel { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+    .info-row { display: grid; grid-template-columns: 75px minmax(0,1fr); align-items: center; gap: 10px; }
+    .info-label { font-size: 14px; font-weight: 800; color: #1e272e; }
+    .info-box { min-width: 0; min-height: 36px; border: 1px solid #7f8fa6; background: #fff; display: flex; align-items: center; justify-content: center; text-align: center; overflow-wrap: anywhere; padding: 4px; font-size: 15px; font-weight: 800; color: #000; }
+    .info-box.green { background: #4cd137; font-size: 20px; }
+    .info-box.fee { color: #c23616; font-size: 17px; }
+    .receipt-header { background: #2f3640; color: #fff; text-align: center; font-size: 13px; font-weight: 800; padding: 6px; border-radius: 3px; }
+    .info-panel.exit-highlight { border: 2px solid #e84118; background: #fffdf5; box-shadow: 0 0 10px rgba(232,65,24,.18); }
+    .info-panel.exit-highlight .receipt-header { background: #e84118; }
+    .fee-card { border: 2px solid #c23616; border-radius: 6px; background: #fff5f5; padding: 8px 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .fee-title { font-size: 12px; font-weight: 800; color: #7f8fa6; letter-spacing: .5px; }
+    .fee-amount { font-size: 25px; font-weight: 900; color: #c23616; text-align: center; }
+    .active-panel { background: #fff; border: 1px solid #8c96a0; border-radius: 4px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+    .active-title { text-align: center; font-size: 14px; font-weight: 900; color: #1e272e; }
+    .active-list { display: flex; flex-direction: column; gap: 7px; max-height: 240px; overflow-y: auto; }
+    .active-empty { border: 1px dashed #a4b0be; background: #f8f9fa; padding: 12px 8px; text-align: center; color: #57606f; font-size: 13px; }
+    .active-card { border: 1px solid #dcdde1; border-left: 4px solid #218c3a; border-radius: 4px; padding: 8px; background: #fbfcfd; }
+    .active-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .active-plate { font-weight: 900; font-size: 15px; color: #192a56; overflow-wrap: anywhere; }
+    .active-slot { white-space: nowrap; background: #dff9e5; color: #1e7e34; border-radius: 3px; padding: 3px 6px; font-size: 12px; font-weight: 800; }
+    .active-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-top: 4px; color: #57606f; }
+    .active-meta strong { color: #2f3640; text-align: right; overflow-wrap: anywhere; }
+    .active-fee { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid #e5e5e5; margin-top: 6px; padding-top: 6px; font-size: 13px; }
+    .active-fee strong { color: #c23616; font-size: 16px; }
+    .active-total { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 2px solid #7f8fa6; padding-top: 8px; font-size: 12px; font-weight: 900; }
+    .active-total strong { color: #c23616; font-size: 17px; }
+    .billing-note { color: #636e72; font-size: 11px; line-height: 1.35; }
+    .manual-card-note { background: #fff; border: 1px solid #8c96a0; border-radius: 4px; padding: 10px; color: #485460; font-size: 12px; line-height: 1.45; }
+
+    .auto-panel { padding: 12px; flex: 1; min-height: 160px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+    .auto-badge { background: #0066cc; color: #fff; border: 2px solid #004999; border-radius: 6px; padding: 14px; text-align: center; font-size: 19px; font-weight: 800; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .pulse-dot { width: 12px; height: 12px; background: #4cd137; border-radius: 50%; box-shadow: 0 0 8px #4cd137; animation: pulse 1.4s infinite; }
+    @keyframes pulse { 0%,100% { transform: scale(.95); opacity: .8; } 50% { transform: scale(1.2); opacity: 1; } }
+    .status-box { border: 1px solid #7f8fa6; background: #f1f2f6; padding: 10px; text-align: center; font-size: 14px; font-weight: 700; color: #2f3640; border-radius: 4px; }
+    .control-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .control-button { border: 0; border-radius: 5px; padding: 12px 8px; font-size: 14px; font-weight: 800; cursor: pointer; color: #fff; }
+    .start-button { background: #218c3a; }
+    .stop-button { background: #c0392b; }
+    .control-button:disabled { background: #95a5a6; cursor: not-allowed; opacity: .75; }
+    .controller-state { text-align: center; font-size: 13px; font-weight: 800; padding: 8px; border: 1px solid #7f8fa6; border-radius: 4px; background: #f1f2f6; }
+    .control-message { color: #57606f; text-align: center; font-size: 12px; min-height: 16px; }
+    @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr 1fr; } .right-col { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; } .clock-box { grid-column: 1 / -1; } }
+    @media (max-width: 600px) { body { padding: 4px; } .container { min-height: calc(100vh - 8px); } .header { font-size: 21px; } .main-grid { grid-template-columns: 1fr; } .right-col { grid-column: auto; display: flex; } .cam-box { height: 220px; } .crop-box { height: 110px; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">BÃI ĐỖ XE THÔNG MINH</div>
+    <div class="main-grid">
+      <div class="panel">
+        <div class="panel-title">CAMERA VÀO</div>
+        <div class="cam-box"><img id="cam_vao" src="/video_feed/VAO" alt="Camera vào" /></div>
+        <div class="crop-box"><img id="crop_vao" src="/plate_crop/VAO" alt="Ký tự đã đọc cổng vào" /></div>
+        <div class="data-row"><div class="data-label">BIỂN SỐ:</div><div class="data-value" id="entry_plate">---</div></div>
+        <div class="data-row"><div class="data-label">THẺ RFID:</div><div class="data-value rfid-value" id="entry_rfid">---</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">CAMERA RA</div>
+        <div class="cam-box"><img id="cam_ra" src="/video_feed/RA" alt="Camera ra" /></div>
+        <div class="crop-box"><img id="crop_ra" src="/plate_crop/RA" alt="Ký tự đã đọc cổng ra" /></div>
+        <div class="data-row"><div class="data-label">BIỂN SỐ:</div><div class="data-value" id="exit_plate">---</div></div>
+        <div class="data-row"><div class="data-label">THẺ RFID:</div><div class="data-value rfid-value" id="exit_rfid">---</div></div>
+      </div>
+
+      <div class="right-col">
+        <div class="clock-box" id="server_time">--:--:-- - --/--/----</div>
+        <div class="info-panel" id="receipt_panel">
+          <div class="info-row"><div class="info-label">SỐ XE</div><div class="info-box green" id="occupied_count">0 / 4</div></div>
+          <div class="receipt-header" id="receipt_header">THÔNG TIN GIAO DỊCH XE RA GẦN NHẤT</div>
+          <div class="info-row"><div class="info-label">BIỂN SỐ</div><div class="info-box" id="receipt_plate">---</div></div>
+          <div class="info-row"><div class="info-label">THẺ RFID</div><div class="info-box" id="receipt_rfid">---</div></div>
+          <div class="info-row"><div class="info-label">VỊ TRÍ ĐỖ</div><div class="info-box" id="receipt_slot">---</div></div>
+          <div class="info-row"><div class="info-label">GIỜ VÀO</div><div class="info-box" id="receipt_entry_time">---</div></div>
+          <div class="info-row"><div class="info-label">GIỜ RA</div><div class="info-box" id="receipt_exit_time">---</div></div>
+          <div class="info-row"><div class="info-label">TỔNG TG</div><div class="info-box" id="receipt_duration">---</div></div>
+          <div class="fee-card">
+            <div class="fee-title">PHÍ GỬI XE ĐÃ TÍNH</div>
+            <div class="fee-amount" id="last_fee">0 VND</div>
+          </div>
+        </div>
+        <div class="active-panel">
+          <div class="active-title">XE ĐANG GỬI - PHÍ TẠM TÍNH</div>
+          <div class="active-list" id="active_vehicles">
+            <div class="active-empty">Chưa có xe đang gửi</div>
+          </div>
+          <div class="active-total">
+            <span>TỔNG PHÍ TẠM TÍNH</span>
+            <strong id="total_live_fee">0 VND</strong>
+          </div>
+          <div class="billing-note" id="billing_note">Đơn giá: 10.000 VND/giờ. Tính từ lúc cảm biến xác nhận xe vào ô, làm tròn lên từng giờ.</div>
+        </div>
+        <div class="manual-card-note">Thẻ RFID do nhân viên phát thủ công tại cổng vào và thu lại thủ công tại cổng ra. Hệ thống chỉ đọc UID để đối chiếu với biển số và phiên gửi xe.</div>
+        <div class="auto-panel">
+          <div class="auto-badge"><span class="pulse-dot"></span><span>GIÁM SÁT BÃI ĐỖ</span></div>
+          <div class="controller-state" id="controller_state">HỆ THỐNG ĐANG DỪNG</div>
+          <div class="control-buttons">
+            <button class="control-button start-button" id="start_button" onclick="sendControl('/api/control/start')">KHỞI CHẠY</button>
+            <button class="control-button stop-button" id="stop_button" onclick="sendControl('/api/control/stop')">DỪNG HỆ THỐNG</button>
+          </div>
+          <div class="control-message" id="control_message"></div>
+          <div class="status-box" id="system_status">Dashboard sẵn sàng - chờ khởi chạy hệ thống</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function sendControl(endpoint) {
+      const message = document.getElementById('control_message');
+      const startButton = document.getElementById('start_button');
+      const stopButton = document.getElementById('stop_button');
+      startButton.disabled = true;
+      stopButton.disabled = true;
+      message.textContent = 'Đang gửi lệnh...';
+      try {
+        const response = await fetch(endpoint, { method: 'POST', cache: 'no-store' });
+        const result = await response.json();
+        message.textContent = result.message || (response.ok ? 'Đã nhận lệnh' : 'Lệnh không thành công');
+        if (!response.ok) message.textContent += ' (HTTP ' + response.status + ')';
+      } catch (error) {
+        message.textContent = 'Không kết nối được máy chủ: ' + error;
+      }
+      await refreshStatus();
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, function (char) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+      });
+    }
+
+    function renderActiveVehicles(vehicles) {
+      const container = document.getElementById('active_vehicles');
+      if (!Array.isArray(vehicles) || vehicles.length === 0) {
+        container.innerHTML = '<div class="active-empty">Chưa có xe đang gửi</div>';
+        return;
+      }
+
+      container.innerHTML = vehicles.map(function (vehicle) {
+        const plate = vehicle.plate || 'Chưa có biển số';
+        const rfid = vehicle.rfid || '---';
+        const slot = vehicle.parked_ts ? (vehicle.slot || 'Chưa xác định') : 'Đang chờ vào ô';
+        const duration = vehicle.duration_text || 'Chưa vào ô đỗ';
+        const fee = vehicle.estimated_fee_text || 'Chưa tính';
+        const billingStatus = vehicle.billing_status || '';
+        return `
+          <div class="active-card">
+            <div class="active-card-top">
+              <span class="active-plate">${escapeHtml(plate)}</span>
+              <span class="active-slot">${escapeHtml(slot)}</span>
+            </div>
+            <div class="active-meta"><span>UID RFID</span><strong>${escapeHtml(rfid)}</strong></div>
+            <div class="active-meta"><span>Thời gian gửi</span><strong>${escapeHtml(duration)}</strong></div>
+            <div class="active-meta"><span>Trạng thái</span><strong>${escapeHtml(billingStatus)}</strong></div>
+            <div class="active-fee"><span>Phí tạm tính</span><strong>${escapeHtml(fee)}</strong></div>
+          </div>`;
+      }).join('');
+    }
+
+    async function refreshStatus() {
+      try {
+        const response = await fetch('/api/status', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        document.getElementById('server_time').textContent = data.server_time || '';
+        document.getElementById('occupied_count').textContent = `${data.occupied_count ?? 0} / ${data.total_slots ?? 4}`;
+        document.getElementById('entry_plate').textContent = data.entry_plate || '---';
+        document.getElementById('entry_rfid').textContent = data.entry_rfid || '---';
+        document.getElementById('exit_plate').textContent = data.exit_plate || '---';
+        document.getElementById('exit_rfid').textContent = data.exit_rfid || '---';
+        document.getElementById('last_fee').textContent = data.last_fee || '0 VND';
+        document.getElementById('receipt_plate').textContent = data.receipt_plate || '---';
+        document.getElementById('receipt_rfid').textContent = data.receipt_rfid || '---';
+        document.getElementById('receipt_slot').textContent = data.receipt_slot || '---';
+        document.getElementById('receipt_entry_time').textContent = data.receipt_entry_time || '---';
+        document.getElementById('receipt_exit_time').textContent = data.receipt_exit_time || '---';
+        document.getElementById('receipt_duration').textContent = data.receipt_duration || '---';
+        document.getElementById('total_live_fee').textContent = data.total_live_fee_text || '0 VND';
+        document.getElementById('billing_note').textContent =
+          'Đơn giá: ' + (data.fee_per_hour_text || '10.000 VND/giờ') +
+          '. Tính từ lúc cảm biến xác nhận xe vào ô, làm tròn lên từng giờ.';
+        renderActiveVehicles(data.active_vehicles || []);
+        document.getElementById('system_status').textContent = data.system_status || '';
+
+        const receiptPanel = document.getElementById('receipt_panel');
+        const receiptHeader = document.getElementById('receipt_header');
+        if (data.is_exiting) {
+          receiptPanel.classList.add('exit-highlight');
+          receiptHeader.textContent = 'PHIẾU TÍNH TIỀN XE RA';
+        } else {
+          receiptPanel.classList.remove('exit-highlight');
+          receiptHeader.textContent = 'THÔNG TIN GIAO DỊCH XE RA GẦN NHẤT';
+        }
+
+        const state = data.controller_status || 'STOPPED';
+        const stateLabels = {
+          STOPPED: 'HỆ THỐNG ĐANG DỪNG',
+          STARTING: 'ĐANG KHỞI ĐỘNG...',
+          RUNNING: 'HỆ THỐNG ĐANG CHẠY',
+          STOPPING: 'ĐANG DỪNG VÀ GIẢI PHÓNG THIẾT BỊ...',
+          ERROR: 'HỆ THỐNG GẶP LỖI'
+        };
+        document.getElementById('controller_state').textContent = stateLabels[state] || state;
+        document.getElementById('start_button').disabled = ['STARTING', 'RUNNING', 'STOPPING'].includes(state);
+        document.getElementById('stop_button').disabled = !['STARTING', 'RUNNING', 'STOPPING'].includes(state);
+        if (state === 'ERROR' && data.controller_error) {
+          document.getElementById('control_message').textContent = data.controller_error;
+        }
+      } catch (error) {
+        console.error('Lỗi cập nhật dashboard:', error);
+      }
+    }
+    ['cam_vao', 'crop_vao', 'cam_ra', 'crop_ra'].forEach(function (id) {
+      const img = document.getElementById(id);
+      if (!img) return;
+      const baseSrc = img.getAttribute('src');
+      img.onerror = function () {
+        setTimeout(function () {
+          img.src = baseSrc + '?t=' + Date.now();
+        }, 1200);
+      };
+    });
+    refreshStatus();
+    setInterval(refreshStatus, 1000);
+  </script>
+</body>
+</html>

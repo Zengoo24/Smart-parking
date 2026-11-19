@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.so
+venv/
+.venv/
+.env
+old_files/
+*_backup.*
+test_*.py
+servo.py
+bai_do_xe_tong_hop_4o_ALPR.py
+parking_data.json
+parking_live.json
+*.csv

@@ -38,11 +38,10 @@ MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
 PUBLISH_INTERVAL = max(1.0, float(os.getenv("MQTT_PUBLISH_INTERVAL", "3")))
 HEARTBEAT_SECONDS = 30.0
 ROOT_TOPIC = os.getenv("MQTT_ROOT_TOPIC", "parking/pi4").strip("/") or "parking/pi4"
-SLOTS = ["P1", "P2", "P3", "P4", "P5"]
+SLOTS = ["P1", "P2", "P3", "P4"]
 
-# Ten vi tri tren bo dieu khien -> ten vi tri tren Digital Twin.
-# Giu dung quy uoc da dung trong bridge truoc do.
-DISPLAY_SOURCE = {"P1": "P1", "P2": "P2", "P3": "P3", "P4": "P4", "P5": "P5"}
+# Mo hinh hien tai dung truc tiep ten 4 o P1-P4, khong dao thu tu.
+DISPLAY_SOURCE = {"P1": "P1", "P2": "P2", "P3": "P3", "P4": "P4"}
 CSV_SCAN_CHUNK = 4096
 
 
@@ -96,6 +95,8 @@ def safe_int(value, default=0):
 
 
 def count_active_sessions():
+    if not ACTIVE_FILE.exists():
+        return 0
     data = read_json(ACTIVE_FILE, None)
     if not isinstance(data, dict):
         return None
@@ -109,6 +110,8 @@ def count_active_sessions():
 # Du lieu dat cho va trang thai bai xe
 # -----------------------------------------------------------------------------
 def reservation_summary():
+    if not RESERVATIONS_FILE.exists():
+        return None
     data = read_json(RESERVATIONS_FILE, None)
     if not isinstance(data, dict):
         return None
@@ -158,14 +161,14 @@ def reservation_summary():
 
 
 def make_status_payload():
-    """Tao status; tra None neu du lieu nguon tam thoi khong hop le."""
+    """Tao status cho mo hinh 4 o; du lieu cu/khong con moi se thanh UNKNOWN."""
     live = read_json(LIVE_FILE, None)
     if not isinstance(live, dict):
         return None
 
     raw_slots = live.get("slots")
     if not isinstance(raw_slots, dict) or any(slot not in raw_slots for slot in SLOTS):
-        log("parking_live.json chua co day du slots; bo qua status lan nay.")
+        log("parking_live.json chua co day du 4 slots; bo qua status lan nay.")
         return None
 
     raw_gates = live.get("gates", {})
@@ -173,18 +176,29 @@ def make_status_payload():
         log("Truong gates khong hop le; bo qua status lan nay.")
         return None
 
-    active_sessions = count_active_sessions()
-    reservations = reservation_summary()
-    if active_sessions is None or reservations is None:
-        log("Thieu JSON hop le cho sessions/reservations; bo qua status lan nay.")
-        return None
+    controller_running = bool(live.get("controller_running", False))
+    sensor_ready = bool(live.get("sensor_ready", False)) and controller_running
+
+    # Neu file ngung cap nhat qua 10 giay, khong giu trang thai cu.
+    try:
+        updated_epoch = float(live.get("updated_at_epoch") or 0)
+    except (TypeError, ValueError, OverflowError):
+        updated_epoch = 0.0
+    if updated_epoch <= 0 or (time.time() - updated_epoch) > 10.0:
+        controller_running = False
+        sensor_ready = False
 
     physical_slots = {}
     for slot in SLOTS:
         state = str(raw_slots.get(slot) or "UNKNOWN").strip().upper()
         physical_slots[slot] = state if state in ("FREE", "OCCUPIED") else "UNKNOWN"
+        if physical_slots[slot] == "UNKNOWN":
+            sensor_ready = False
 
-    held_physical_slots = reservations.get("held_physical_slots", {})
+    reservations = reservation_summary()
+    held_physical_slots = (
+        reservations.get("held_physical_slots", {}) if reservations is not None else {}
+    )
     display_slots = {}
     for display_name, physical_name in DISPLAY_SOURCE.items():
         state = physical_slots[physical_name]
@@ -192,15 +206,26 @@ def make_status_payload():
             state = "RESERVED"
         display_slots[display_name] = state
 
+    if not sensor_ready:
+        display_slots = {slot: "UNKNOWN" for slot in SLOTS}
+
     gates = {}
     for gate_name in ("entry", "exit"):
         state = str(raw_gates.get(gate_name) or "UNKNOWN").strip().upper()
+        if not controller_running:
+            state = "UNKNOWN"
         gates[gate_name] = state if state in ("OPEN", "CLOSED") else "UNKNOWN"
 
-    sensor_ready = all(state in ("FREE", "OCCUPIED") for state in physical_slots.values())
-    return {
+    active_sessions = count_active_sessions()
+    if active_sessions is None:
+        active_sessions = safe_int(live.get("active_sessions"), 0)
+
+    payload = {
         "device": "raspberrypi4b",
+        "schema_version": 1,
         "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "controller_running": controller_running,
+        "controller_status": "RUNNING" if controller_running else "STOPPED_OR_STALE",
         "slots": display_slots,
         "free_count": sum(state == "FREE" for state in display_slots.values()) if sensor_ready else None,
         "occupied_count": sum(state == "OCCUPIED" for state in display_slots.values()) if sensor_ready else None,
@@ -209,6 +234,8 @@ def make_status_payload():
         "gates": gates,
         "active_sessions": active_sessions,
     }
+
+    return payload
 
 
 # -----------------------------------------------------------------------------
@@ -303,6 +330,9 @@ def get_history_events():
     dau cuoi dong hoan chinh hien tai de khong gui lai toan bo lich su cu.
     Dong CSV dang ghi do duoc giu lai cho chu ky sau.
     """
+    if not HISTORY_FILE.exists():
+        return [], None
+
     try:
         with HISTORY_FILE.open("rb") as file_handle:
             stat_result = os.fstat(file_handle.fileno())
@@ -321,7 +351,7 @@ def get_history_events():
                 return [], None
             header_end = file_handle.tell()
 
-            raw_cursor = read_json(CURSOR_FILE, None)
+            raw_cursor = read_json(CURSOR_FILE, None) if CURSOR_FILE.exists() else None
             cursor, needs_migration = validate_cursor(
                 raw_cursor, file_handle, stat_result, header, header_end
             )
@@ -436,10 +466,10 @@ def make_client():
     try:
         client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2,
-            client_id="parking-pi4-bridge",
+            client_id="parking-pi4-bridge-4slot",
         )
     except (AttributeError, TypeError):
-        client = mqtt.Client(client_id="parking-pi4-bridge")
+        client = mqtt.Client(client_id="parking-pi4-bridge-4slot")
 
     if MQTT_USERNAME:
         client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
@@ -485,7 +515,7 @@ def main():
     last_reservations = None
     last_heartbeat = 0.0
 
-    log("MQTT Bridge dang chay; khong truy cap GPIO.")
+    log("MQTT Bridge 4 o dang chay; chi doc JSON/CSV, khong truy cap GPIO va khong gui UID/bien so.")
     log("Status: {}/status".format(ROOT_TOPIC))
     log("Events: {}/events".format(ROOT_TOPIC))
     log("Reservations: {}/reservations".format(ROOT_TOPIC))

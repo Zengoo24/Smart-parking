@@ -6,6 +6,7 @@ API:
     start_web_server(plate_system=None, host='0.0.0.0', port=5000)
     update_web_state(**kwargs)
     format_ts(timestamp)
+    pop_pending_resets()
 """
 
 import copy
@@ -17,7 +18,7 @@ from datetime import datetime
 
 import cv2
 import numpy as np
-from flask import Flask, Response, jsonify, render_template
+from flask import Flask, Response, jsonify, render_template, request
 from config import ROI_REFERENCE_WIDTH, ROI_REFERENCE_HEIGHT, FEE_PER_HOUR
 
 # Tat log truy cap HTTP /api/status de giam I/O va khong troi log he thong
@@ -34,6 +35,9 @@ _control_lock = threading.RLock()
 _on_start = None
 _on_stop = None
 _status_provider = None
+
+_reset_lock = threading.Lock()
+_pending_resets = []
 
 _web_state = {
     "occupied_count": 0,
@@ -82,6 +86,60 @@ def format_ts(ts):
         return datetime.fromtimestamp(float(ts)).strftime("%H:%M:%S - %d/%m/%Y")
     except (TypeError, ValueError, OSError, OverflowError):
         return ""
+
+
+def pop_pending_resets():
+    """Lay danh sach (uid, plate, reset_all) de main.py xu ly trong vong lap chinh."""
+    with _reset_lock:
+        if not _pending_resets:
+            return []
+        items = list(_pending_resets)
+        _pending_resets.clear()
+        return items
+
+
+def _reset_when_stopped(clean_uid, clean_plate, reset_all):
+    """Xoa truc tiep trong parking_data.json khi he thong dang dung."""
+    from storage import load_active, save_active, normalize_plate, format_plate
+
+    active = load_active()
+    removed = 0
+    for uid_key in list(active.keys()):
+        rec = active.get(uid_key)
+        rec_plate = normalize_plate(rec.get("plate")) if isinstance(rec, dict) else ""
+        if reset_all or (clean_uid and uid_key == clean_uid) or (clean_plate and rec_plate == clean_plate):
+            active.pop(uid_key, None)
+            removed += 1
+
+    if removed > 0:
+        save_active(active)
+
+    vehicles = []
+    for uid_key, record in active.items():
+        if not isinstance(record, dict):
+            continue
+        parked_ts = record.get("parked_ts")
+        current_slot = record.get("slot")
+        if parked_ts is not None and not current_slot:
+            current_slot = "Dang di chuyen"
+        cleaned_hex = "".join(ch for ch in str(uid_key).upper() if ch in "0123456789ABCDEF")
+        vehicles.append({
+            "plate": format_plate(record.get("plate")) if record.get("plate") else "",
+            "rfid": " ".join(cleaned_hex[i:i + 2] for i in range(0, len(cleaned_hex), 2)),
+            "slot": str(current_slot or ""),
+            "parked_ts": parked_ts,
+            "entry_ts": record.get("entry_ts"),
+            "awaiting_slot": bool(record.get("awaiting_slot")),
+        })
+
+    update_web_state(
+        active_vehicles=vehicles,
+        entry_plate="",
+        entry_rfid="",
+        exit_plate="",
+        exit_rfid="",
+    )
+    return removed
 
 
 def _make_blank_jpeg(width=480, height=300, color=(30, 35, 42), message="Dang cho hinh anh"):
@@ -457,6 +515,32 @@ def api_control_stop():
         return jsonify({"ok": False, "message": str(exc)}), 500
 
 
+@app.route("/api/session/reset", methods=["POST"])
+def api_session_reset():
+    payload = request.get_json(silent=True) or {}
+    reset_all = bool(payload.get("reset_all"))
+    clean_uid = "".join(ch for ch in str(payload.get("uid", "")).upper() if ch in "0123456789ABCDEF")
+    clean_plate = "".join(ch for ch in str(payload.get("plate", "")).upper() if ch.isalnum())
+
+    if not reset_all and not clean_uid and not clean_plate:
+        return jsonify({"ok": False, "message": "Thiếu thông tin thẻ hoặc biển số cần reset"}), 400
+
+    with _plate_system_lock:
+        is_running = _plate_system_ref is not None
+
+    if is_running:
+        with _reset_lock:
+            _pending_resets.append((clean_uid, clean_plate, reset_all))
+        label = "tất cả thẻ" if reset_all else (clean_plate or clean_uid)
+        return jsonify({"ok": True, "message": "Đã reset phiên cho " + label}), 200
+
+    try:
+        removed = _reset_when_stopped(clean_uid, clean_plate, reset_all)
+        return jsonify({"ok": True, "message": "Đã xóa {} phiên thẻ khỏi dữ liệu".format(removed)}), 200
+    except Exception as exc:
+        return jsonify({"ok": False, "message": "Lỗi reset: {}".format(exc)}), 500
+
+
 @app.route("/video_feed/<gate>")
 def video_feed(gate):
     gate = gate.upper()
@@ -488,6 +572,8 @@ def set_plate_system(plate_system):
         _plate_system_ref = plate_system
     _last_frame_times["VAO"] = -1.0
     _last_frame_times["RA"] = -1.0
+    _LAST_RENDERED_PLATE["VAO"] = None
+    _LAST_RENDERED_PLATE["RA"] = None
 
 
 def start_web_server(

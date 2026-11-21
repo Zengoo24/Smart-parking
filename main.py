@@ -1,26 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-BAI DO XE THONG MINH - RASPBERRY PI 4B
-
-4 o do | 2 cong VAO / RA | 2 RC522 | 1 LCD1602 | 2 camera OV9726
-ANPR: Contour + Perspective Warp + Connected Components + UKNUMBER Template Matching
-Quy trinh: IR -> ANPR -> RFID -> DOI CHIEU -> MO BARIE (state machine)
-
-LCD1602 duy nhat (TCA9548A CH0):
-- Chi hien thi tinh trang bai do: so o trong va ma cac o trong.
-- Khong su dung man hinh LCD thu hai.
-- Bien so, UID, thoi gian gui va phi duoc xu ly/luu ngam cho website.
-- Giu nguyen GPIO, mapping IC, RFID, ANPR va thong so servo trong config.py.
-"""
-
 import json
 import os
 import signal
+from datetime import datetime
 import threading
 import time
-from datetime import datetime
 
 import cv2
 import RPi.GPIO as GPIO
@@ -67,7 +53,7 @@ try:
         set_plate_system,
         update_web_state,
         format_ts,
-        pop_pending_reset_uids,
+        pop_pending_resets,
     )
 except ImportError:
     from web_dashboard import (
@@ -77,7 +63,7 @@ except ImportError:
         format_ts,
     )
 
-    def pop_pending_reset_uids():
+    def pop_pending_resets():
         return []
 
 
@@ -613,16 +599,10 @@ def run_controller(stop_event):
 
                     if duplicate_uid is not None and duplicate_uid != uid:
                         print("[ENTRY DENY] BIEN SO DA TON TAI: {}".format(plate), flush=True)
-                        update_web_state(
-                            system_status="Tu choi vao: bien so {} da co trong bai".format(
-                                format_plate(plate)
-                            )
-                        )
                         stop_plate_session("VAO")
                         e_gate.to_wait_clear()
 
                     elif not lot.can_admit(occupied):
-                        update_web_state(system_status="Tu choi vao: bai da day")
                         stop_plate_session("VAO")
                         e_gate.to_wait_clear()
 
@@ -692,7 +672,6 @@ def run_controller(stop_event):
                 if not entry_ir:
                     e_gate.reset()
                     clear_plate_session("VAO")
-                    update_web_state(entry_plate="", entry_rfid="")
 
             elif e_gate.state == "OPEN":
                 if entry_ir:
@@ -835,6 +814,7 @@ def run_controller(stop_event):
                                 "end_ts": None,
                                 "fee": fee,
                             }
+
                             fee_reset_deadline = None
                             update_web_state(
                                 exit_plate=format_plate(plate),
@@ -899,7 +879,6 @@ def run_controller(stop_event):
                 if not exit_ir:
                     x_gate.reset()
                     clear_plate_session("RA")
-                    update_web_state(exit_plate="", exit_rfid="")
 
             elif x_gate.state == "OPEN":
                 if exit_ir:
@@ -978,21 +957,24 @@ def run_controller(stop_event):
             # =================================================
             # 11. XU LY RESET THE TU WEB & DONG BO DANH SACH XE
             # =================================================
-            for reset_uid in pop_pending_reset_uids():
-                if reset_uid in active:
-                    reset_plate = active[reset_uid].get("plate", "")
-                    lot.finish_exit(reset_uid)
-                    update_web_state(
-                        system_status="Da reset phien the {} (BS: {})".format(
-                            get_card_display(reset_uid),
-                            format_plate(reset_plate) if reset_plate else "N/A",
-                        )
-                    )
+            for reset_uid, reset_plate, reset_all in pop_pending_resets():
+                matched_uids = []
+                for uid_key, rec in list(active.items()):
+                    rec_plate = normalize_plate(rec.get("plate")) if isinstance(rec, dict) else ""
+                    if reset_all or (reset_uid and uid_key == reset_uid) or (reset_plate and rec_plate == reset_plate):
+                        matched_uids.append(uid_key)
+
+                for uid_key in matched_uids:
+                    old_plate = active[uid_key].get("plate", "")
+                    lot.finish_exit(uid_key)
                     print(
-                        "[WEB RESET] Da xoa phien cua UID={} PLATE={}".format(
-                            reset_uid, reset_plate
-                        ),
+                        "[WEB RESET] Da xoa phien UID={} PLATE={}".format(uid_key, old_plate),
                         flush=True,
+                    )
+
+                if matched_uids:
+                    update_web_state(
+                        system_status="Da reset {} the khoi he thong".format(len(matched_uids))
                     )
 
             web_active_vehicles = build_active_vehicle_payload(active)
